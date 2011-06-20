@@ -9,6 +9,35 @@ require 'active_support/time'
 
 @config = YAML.load_file('config.yml')
 
+if @config['leap_seconds']
+  #leap seconds are enabled.
+  unless (File.exists?(@config['leap_seconds']['local_file']) && (File.mtime(@config['leap_seconds']['local_file']).to_i > (Time.now.to_i - @config['leap_seconds']['cache_ttl'])))
+    # Need to download the NIST leap seconds file.
+    require 'net/ftp'
+    require 'uri'
+    uri = URI.parse(@config['leap_seconds']['list_source'])
+    Net::FTP.open(uri.host) do |ftp|
+      ftp.login
+      ftp.getbinaryfile(uri.path, @config['leap_seconds']['local_file'])
+    end
+  end
+  highest = 0
+  File.open(@config['leap_seconds']['local_file'],'r') do |list|
+    list.each_line do |line|
+      next if line =~ /^#/
+      i = line.to_i
+      highest = i if i > highest
+    end
+  end
+  utc = ActiveSupport::TimeZone.new('UTC')
+  leap = utc.at highest - @config['leap_seconds']['ntp_offset']
+  now = utc.now
+  # Dont test down to the second because CRON might be slightly wonky.
+  if ((leap.year == now.year) && (leap.yday == now.yday) && (leap.hour == now.hour) && (leap.min == now.min))
+    @leap_second = true
+  end
+end
+
 @hour_word = {
   0 => "twelve",
   1 => "one",
@@ -49,6 +78,9 @@ end
 
 # Basic sanity checking...
 if (@now.min == 0)
-  Twitter.update("beep beep beep beep beeeep. it's #{@hour_word[@now.hour]} o'clock.")
-  #puts ("Beep beep beep beep beep beeeep. It's #{@hour_word[@now.hour]} o'clock.")
+  if @leap_second
+    Twitter.update ("Beep beep beep beep beep beep beeeep. It's #{@hour_word[@now.hour]} o'clock.")
+  else
+    Twitter.update ("Beep beep beep beep beep beeeep. It's #{@hour_word[@now.hour]} o'clock.")
+  end
 end

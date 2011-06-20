@@ -1,1 +1,17 @@
 Source code for the @rnz_pips twitter bot. Nothing flash.
+
+config.yml structure:
+
+twitter:
+  username: 
+  consumer_key: 
+  consumer_secret: 
+  oauth_token: 
+  oauth_token_secret: 
+
+leap_seconds:
+  list_source: "ftp://time.nist.gov/pub/leap-seconds.list"
+  cache_ttl: 2723040 # 1 month
+  ntp_offset: 2208988800
+  local_file: leap-seconds.list
+
